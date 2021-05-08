@@ -1,11 +1,20 @@
 """
 Dungeons & Dragons tool-kit
 A module containing functions that simulate/calculate dice-rolls/scores
+
+todo:
+    - [] integrate the probability of the score you rolled into:
+        - [] initiative
+        - [] attack
+        - [] damage
+
 """
 import statistics
 from typing import *
 import random
 import functools
+import itertools
+import pandas as pd
 
 D20: int = 20
 
@@ -79,6 +88,25 @@ def roll_vantage(d: int, vantage: str) -> int:
     return roll
 
 
+def prob_of_roll(dice: Tuple[int, ...], total: Optional[int] = None) -> pd.DataFrame:
+    """return the score probability distribution of the passed dice. If total passed return the
+    specfic probability corresponding to that total"""
+    dice = {f'{i}_d{d}': range(1, d + 1) for i, d in enumerate(dice)}
+    combinations = list(itertools.product(*dice.values()))
+    df = (pd.DataFrame(combinations, columns=dice.keys())
+          .assign(total=lambda x: x.sum(1))
+          .assign(dist=lambda x: x.groupby('total').transform('count').iloc[:, 0])
+          .assign(prob=lambda x: x['dist'] / x.shape[0])
+          .drop(dice.keys(), 1)
+          .drop_duplicates()
+          .set_index('total')
+          .sort_index()
+          )
+    if total:
+        return df.loc[total]
+    return df
+
+
 def dict2str(modifiers):
     modifiers_str = ', '.join([f'{k}={v}' for k, v in modifiers.items()])
     return modifiers_str
@@ -89,8 +117,6 @@ def avg_roll(func: Callable) -> float:
 
 
 roll_initiative()
-
-avg_roll(roll_initiative)
 
 roll_attack(
     n=2,
@@ -108,3 +134,5 @@ roll_damage(**args)
 
 roll_damage_partial = functools.partial(roll_damage, **args)
 avg_roll(roll_damage_partial)
+
+prob_of_roll((6, 6))
